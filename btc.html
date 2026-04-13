@@ -319,7 +319,11 @@ footer a{color:var(--bl);text-decoration:none}
 // ═══════════════════════════════════════════════════════════════
 const W = 300;
 const CHAINLINK_BTC_USD = '0xF4030086522a5bEEa4988F8cA5B36dbC97BeE88b';
-const ETH_RPC = 'https://cloudflare-eth.com';
+const ETH_RPCS = [
+  'https://rpc.ankr.com/eth',
+  'https://ethereum.publicnode.com',
+  'https://cloudflare-eth.com'
+];
 const BINANCE_URL = n => `https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1m&limit=${n}`;
 
 let curTs = null, lastFetch = 0, lastPriceFetch = 0, fetchCount = 0;
@@ -732,31 +736,43 @@ function renderPrediction(pred, marketUp) {
 //  FETCH: CHAINLINK PRICE VIA ETHEREUM RPC
 // ═══════════════════════════════════════════════════════════════
 async function fetchChainlinkPrice() {
-  try {
-    const res = await fetch(ETH_RPC, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        jsonrpc: '2.0', id: 1, method: 'eth_call',
-        params: [{ to: CHAINLINK_BTC_USD, data: '0xfeaf968c' }, 'latest']
-      })
-    });
-    const d = await res.json();
-    if (!d.result) throw new Error('no result');
-    const hex = d.result.startsWith('0x') ? d.result.slice(2) : d.result;
-    // Layout: [roundId(80), answer(256), startedAt(256), updatedAt(256), answeredInRound(80)]
-    // Each slot = 32 bytes = 64 hex chars. answer is slot 1 (bytes 64-127)
-    const ansHex = hex.slice(64, 128);
-    const raw = BigInt('0x' + ansHex);
-    // int256 sign check
-    const SIGN = BigInt('0x8000000000000000000000000000000000000000000000000000000000000000');
-    const price = raw >= SIGN
-      ? Number(-(BigInt('0x10000000000000000000000000000000000000000000000000000000000000000') - raw)) / 1e8
-      : Number(raw) / 1e8;
-    return price;
-  } catch (e) {
-    return null;
+  for (const rpc of ETH_RPCS) {
+    try {
+      const res = await fetch(rpc, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'eth_call',
+          params: [{
+            to: CHAINLINK_BTC_USD,
+            data: '0xfeaf968c'
+          }, 'latest']
+        })
+      });
+
+      const d = await res.json();
+      if (!d.result) continue;
+
+      const hex = d.result.startsWith('0x') ? d.result.slice(2) : d.result;
+      const ansHex = hex.slice(64, 128);
+      const raw = BigInt('0x' + ansHex);
+
+      const SIGN = BigInt('0x8000000000000000000000000000000000000000000000000000000000000000');
+
+      const price = raw >= SIGN
+        ? Number(-(BigInt('0x10000000000000000000000000000000000000000000000000000000000000000') - raw)) / 1e8
+        : Number(raw) / 1e8;
+
+      return price;
+
+    } catch (e) {
+      console.log("RPC failed:", rpc);
+    }
   }
+
+  return null;
 }
 
 // ═══════════════════════════════════════════════════════════════

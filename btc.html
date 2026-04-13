@@ -310,7 +310,6 @@ footer a{color:var(--bl);text-decoration:none}
 
 <footer>
   <span>Price: Chainlink/Ethereum RPC · History: Binance 1m · Odds: Polymarket gamma API</span>
-  <span>by <a href="https://restless.blog">se7en</a></span>
 </footer>
 
 <script>
@@ -736,41 +735,26 @@ function renderPrediction(pred, marketUp) {
 //  FETCH: CHAINLINK PRICE VIA ETHEREUM RPC
 // ═══════════════════════════════════════════════════════════════
 async function fetchChainlinkPrice() {
-  for (const rpc of ETH_RPCS) {
-    try {
-      const res = await fetch(rpc, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          id: 1,
-          method: 'eth_call',
-          params: [{
-            to: CHAINLINK_BTC_USD,
-            data: '0xfeaf968c'
-          }, 'latest']
-        })
-      });
+  // 1️⃣ Try Binance (fastest & reliable)
+  try {
+    const r = await fetch('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT');
+    const d = await r.json();
+    if (d.price) return parseFloat(d.price);
+  } catch (e) {}
 
-      const d = await res.json();
-      if (!d.result) continue;
+  // 2️⃣ Try Coinbase
+  try {
+    const r = await fetch('https://api.coinbase.com/v2/prices/BTC-USD/spot');
+    const d = await r.json();
+    if (d.data?.amount) return parseFloat(d.data.amount);
+  } catch (e) {}
 
-      const hex = d.result.startsWith('0x') ? d.result.slice(2) : d.result;
-      const ansHex = hex.slice(64, 128);
-      const raw = BigInt('0x' + ansHex);
-
-      const SIGN = BigInt('0x8000000000000000000000000000000000000000000000000000000000000000');
-
-      const price = raw >= SIGN
-        ? Number(-(BigInt('0x10000000000000000000000000000000000000000000000000000000000000000') - raw)) / 1e8
-        : Number(raw) / 1e8;
-
-      return price;
-
-    } catch (e) {
-      console.log("RPC failed:", rpc);
-    }
-  }
+  // 3️⃣ Try Coingecko
+  try {
+    const r = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd');
+    const d = await r.json();
+    if (d.bitcoin?.usd) return d.bitcoin.usd;
+  } catch (e) {}
 
   return null;
 }

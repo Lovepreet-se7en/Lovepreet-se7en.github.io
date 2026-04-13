@@ -337,7 +337,7 @@ let accHits = 0, accTotal = 0;
 const getWinTs = s => Math.floor(s / W) * W;
 const slug = ts => `btc-updown-5m-${ts}`;
 const pmUrl = ts => `https://polymarket.com/event/${slug(ts)}`;
-const apiUrl = ts => `https://gamma-api.polymarket.com/markets?slug=${slug(ts)}`;
+const apiUrl = ts => `https://summer-dew-3be1.lovepreet-se7en.workers.dev/?slug=${slug(ts)}`;
 
 function fmtEt(ts) {
   const o = { timeZone: 'America/New_York', hour12: true, hour: '2-digit', minute: '2-digit' };
